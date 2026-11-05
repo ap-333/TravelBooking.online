@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# plain-HTML build + C++ server artifacts
+/web/*.gz
+/web/assets/*.gz
+/web/**/*.gz
+/server/tbserver
+/data/
+
+# local tooling
+/.claude/
+/.stash/

@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TravelBooking.online
 
-## Getting Started
+Plain HTML and CSS website, served by a small dependency-free C++ server.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+web/        the site: generated .html pages + hand-written assets (assets/style.css, assets/app.js, fonts/, brand/)
+tools/      page generator (Node, no packages) and the content it reads (tools/content/)
+server/     tbserver: static file server + enquiry API in one C++17 file
+data/       created at runtime; enquiries are appended to data/enquiries.jsonl
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Build and run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+node tools/build.mjs          # regenerate the HTML pages in web/ (GTM_ID=GTM-XXXX to add Tag Manager)
+make -C server                # compile the server
+make -C server gzip           # pre-compress text files (the server sends the .gz automatically)
+PORT=8080 ./server/tbserver   # run
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`npm run build:site` does the first three steps. Node is only needed to regenerate pages; the running site needs just the compiled `tbserver` binary and the `web/` folder.
 
-## Learn More
+Server settings (environment variables): `PORT` (8080), `WEB_ROOT` (web), `DATA_DIR` (data), `BIND` (0.0.0.0), `TRUST_PROXY=1` when behind nginx/Cloudflare so rate limiting sees the real visitor IP.
 
-To learn more about Next.js, take a look at the following resources:
+The server speaks plain HTTP. Put it behind a TLS terminator (Cloudflare, nginx, Caddy) for HTTPS.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What the server does
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Clean URLs (`/flight-booking` serves `flight-booking.html`), redirects for `.html` and trailing slashes, real 404 page.
+- ETag / 304, long-lived caching for `/assets` and `/fonts`, gzip from pre-compressed files.
+- Security headers on every response; blocks dotfiles and path traversal.
+- `POST /api/enquiry`: validates name, phone and email, drops honeypot hits, rate-limits to 5 per IP per 10 minutes, appends a JSON line to `data/enquiries.jsonl`.
+- Caps: 16 KB headers and body, 512 concurrent connections, 10 s read timeout.
 
-## Deploy on Vercel
+## Editing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Business details and the phone number: `tools/content/site.mjs`.
+- Landing page copy: `tools/content/landing.mjs`. Home, About, Contact and policy page text: `tools/build.mjs`.
+- Look and feel: `web/assets/style.css`.
+- Re-run `node tools/build.mjs` (and `make -C server gzip`) after any change.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Checks
+
+```bash
+./server/tbserver &                       # with pages built
+node scripts/seo-audit.mjs http://localhost:8080   # per-page SEO, icons, manifest, robots, sitemap, llms/security.txt, links, redirects, headers, 404
+node tools/make-icons.mjs                  # regenerate favicon.ico and PNG icons from web/icon.svg (macOS)
+npm run check:launch                       # fails while placeholder text remains
+```
+
+## Before going live
+
+1. Fill every placeholder `check:launch` reports: legal entity, address and hours in `tools/content/site.mjs`, and the bracketed text on the policy pages in `tools/build.mjs`. Have a lawyer review the policy pages.
+2. Decide where enquiries go. Today they are only written to `data/enquiries.jsonl`; forward them to email or a CRM.
+3. Add consent handling before enabling ad or analytics tags where required, then build with `GTM_ID=GTM-XXXXXXX`.
+4. Deploy behind HTTPS, submit `/sitemap.xml` in Google Search Console and re-run the SEO audit on the live URL.
+
+`src/` and the Next.js config are the earlier React version of this site. They are no longer used by the plain build and can be archived.

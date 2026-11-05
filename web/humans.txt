@@ -1,0 +1,8 @@
+/* TEAM */
+Operator: TRAVELBOOKINGONLINE LLC
+Contact: contact@travelbooking.online
+Location: Plymouth, MA, USA
+
+/* SITE */
+Last update: 2026-11-05
+Standards: HTML5, CSS3, schema.org JSON-LD
